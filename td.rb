@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'json'
+require 'readline'
 
 user_dir = ENV['HOME']
 task_file = user_dir + '/.rubydo.json'
@@ -72,8 +73,7 @@ class Tasklist
 			# build prompt, request user to select
 			puts "Please select from the following:"
 			item.each_with_index.map { |x, i| puts "   #{i}. #{x}" }
-			print "> "
-			selection = gets.chomp.to_i
+			selection = Readline.readline("> ").chomp.to_i
 
 			# TODO: Harden
 			Gem.win_platform? ? (system "cls") : (system "clear")
@@ -91,7 +91,7 @@ class Tasklist
 	end
 
 	def show_tasks(show_deleted=false)
-		status = [' ✅', '']
+		status = [' ✓', '']
 		if !@tasks.empty?
 			#@tasks.each_with_index.map { |task, i| puts "#{i}. #{task.task}#{status[task.status]}" }
 			@open_tasks.clear
@@ -106,7 +106,7 @@ class Tasklist
 			
 			# print closed tasks
 			puts "Closed Tasks:"
-			@closed_tasks.map { |task| puts "\t-. #{task.task}#{status[task.status]}" }
+			@closed_tasks.map { |task| puts "\t- #{task.task}#{status[task.status]}" }
 		end
 	end
 end
@@ -118,7 +118,6 @@ tl = Tasklist.new(task_file)
 def print_menu(menu)
 	puts "please use the following commands: "
 	puts "   #{menu.join(", ")}"
-	print "> "
 end
 
 def process_response(tl, resp, sdt)
@@ -170,7 +169,7 @@ def run_interactive(tl)
 		print_menu menu
 		# reset response item
 		resp = ''
-		resp = gets.strip
+		resp = Readline.readline("> ").strip
 		resp = process_response(tl, resp, SHOW_DELETED_TASKS)
 	end
 end
@@ -192,7 +191,7 @@ if !ARGV.empty?
 		puts "unknown command: #{ARGV[0]}"
 	end
 
-	todolist.show_tasks(SHOW_DELETED_TASKS)
+	tl.show_tasks(SHOW_DELETED_TASKS)
 
 else
 	run_interactive(tl)
