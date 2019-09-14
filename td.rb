@@ -2,6 +2,8 @@
 
 require 'json'
 
+SHOW_DELETED_TASKS = true
+
 user_dir = ENV['HOME']
 todo_file = user_dir + '/.rubydo.rb'
 
@@ -33,6 +35,12 @@ class TodoList
 		
 	end
 
+	def reopen_task(key)
+		if @closed_tasks.delete(key)
+			@open_tasks.store(key, Time.new)
+		end
+	end
+
 	def delete_task(key)
 		@closed_tasks.delete(key)
 		@open_tasks.delete(key)
@@ -42,7 +50,7 @@ class TodoList
 		# write to json file
 	end
 
-	def show_tasks(show_deleted=true)
+	def show_tasks(show_deleted=si)
 		if !@open_tasks.empty?
 			puts "Open Tasks:"
 			@open_tasks.keys.map { |task| puts "\t#{task}"}
@@ -71,7 +79,7 @@ def print_menu(menu)
 	print "> "
 end
 
-def process_response(tl, resp)
+def process_response(tl, resp, sdt)
 	Gem.win_platform? ? (system "cls") : (system "clear")
 	#puts "You entered \"#{resp}\""
 
@@ -91,6 +99,9 @@ def process_response(tl, resp)
 	when /^(c|co|com|comp|compl|comple|complet|complete)$/
 		puts "marking #{item} complete"
 		tl.complete_task(item)
+	when /^(r|re|reo|reop|reope|reopen)$/
+		puts "reopening #{item}"
+		tl.reopen_task(item)
 	when /^(d|de|del|dele|delet|delete)$/
 		puts "deleting #{item}"
 		tl.delete_task(item)
@@ -100,7 +111,7 @@ def process_response(tl, resp)
 		puts "#{action} is not a valid action" # Throw error and do nothing
 	end
 
-	puts tl.show_tasks
+	puts tl.show_tasks(sdt)
 
 	return action[0].downcase
 end
@@ -118,7 +129,7 @@ def run_interactive(tl)
 		# reset response item
 		resp = ''
 		resp = gets.strip
-		resp = process_response(tl, resp)
+		resp = process_response(tl, resp, SHOW_DELETED_TASKS)
 	end
 end
 
@@ -139,7 +150,7 @@ if !ARGV.empty?
 		puts "unknown command: #{ARGV[0]}"
 	end
 
-	todolist.show_tasks
+	todolist.show_tasks(SHOW_DELETED_TASKS)
 
 else
 	run_interactive(todolist)
