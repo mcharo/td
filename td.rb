@@ -53,14 +53,14 @@ class TodoList
 	def show_tasks(show_deleted=si)
 		if !@open_tasks.empty?
 			puts "Open Tasks:"
-			@open_tasks.keys.map { |task| puts "\t#{task}"}
+			@open_tasks.keys.each_with_index.map { |task,i| puts "\t#{i}. #{task}"}
 		else
 			puts "No Open Tasks"
 		end
 		if show_deleted
 			if !@closed_tasks.empty?
 				puts "Closed Tasks"
-				@closed_tasks.keys.map { |task| puts "\t#{task}"}
+				@closed_tasks.keys.each_with_index.map { |task| puts "\t#{task}"}
 			else
 				puts "No Closed Tasks"
 			end
