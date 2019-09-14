@@ -60,7 +60,7 @@ class TodoList
 		if show_deleted
 			if !@closed_tasks.empty?
 				puts "Closed Tasks"
-				@closed_tasks.keys.each_with_index.map { |task| puts "\t#{task}"}
+				@closed_tasks.keys.each_with_index.map { |task,i| puts "\t#{i}. #{task}"}
 			else
 				puts "No Closed Tasks"
 			end
