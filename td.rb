@@ -2,76 +2,118 @@
 
 require 'json'
 
+user_dir = ENV['HOME']
+task_file = user_dir + '/.rubydo.json'
+
 SHOW_DELETED_TASKS = true
 
-user_dir = ENV['HOME']
-todo_file = user_dir + '/.rubydo.rb'
+class Task
+	include Comparable
 
-# puts "checking for backing file: #{todo_file}"
+	attr_accessor :task
+	attr_accessor :status
+	attr_accessor :timestamp
 
-# TODO: Need to figure out showing deleted tasks.
-class TodoList
-
-	@backing_file
-	@open_tasks
-	@closed_tasks
-
-	def initialize(tdfile)
-		@backing_file = tdfile
-		@open_tasks = Hash.new
-		@closed_tasks = Hash.new
-		# Need to see if files exists
-		# Load values
-	end 
-
-	def add_task(key)
-		@open_tasks.store(key, Time.new)
+	def <=>(other)
+		@timestamp <=> other.timestamp
 	end
 
-	def complete_task(key)
-		if @open_tasks.delete(key)
-			@closed_tasks.store(key, Time.new)
+	def initialize(task)
+		@task = task
+		@status = 1
+		@timestamp = Time.new
+	end
+end
+
+class Tasklist
+	attr_accessor :backing_file
+	attr_accessor :tasks
+
+	def initialize(backing_file)
+		@backing_file = backing_file
+		@tasks = Array.new
+		@open_tasks = Array.new
+		@closed_tasks = Array.new
+	end
+
+	def add(item)
+		# Add to tasklist
+		if !(@tasks.map { |x| x.task }).include?(item)
+			@tasks.push(Task.new(item))
 		end
-		
 	end
 
-	def reopen_task(key)
-		if @closed_tasks.delete(key)
-			@open_tasks.store(key, Time.new)
-		end
-	end
-
-	def delete_task(key)
-		@closed_tasks.delete(key)
-		@open_tasks.delete(key)
-	end
-
-	def save_tasks(path=@backing_file)
-		# write to json file
-	end
-
-	def show_tasks(show_deleted=si)
-		if !@open_tasks.empty?
-			puts "Open Tasks:"
-			@open_tasks.keys.each_with_index.map { |task,i| puts "\t#{i}. #{task}"}
-		else
-			puts "No Open Tasks"
-		end
-		if show_deleted
-			if !@closed_tasks.empty?
-				puts "Closed Tasks"
-				@closed_tasks.keys.each_with_index.map { |task,i| puts "\t#{i}. #{task}"}
-			else
-				puts "No Closed Tasks"
+	def complete(item)
+		# Complete item in tasklist
+		item = user_select(fuzzy_match(item))
+		for task in tasks
+			if task.task == item && task.status == 1
+				task.status = 0
 			end
 		end
 	end
 
+	def reopen(item)
+		item = user_select(fuzzy_match(item))
+		for task in tasks
+			if task.task == item && task.status == 0
+				task.status = 1
+			end
+		end
+	end
+
+	def delete(item)
+		item = user_select(fuzzy_match(item))
+		@tasks.delete_if { |t| t.task == item } 
+	end
+
+	def user_select(item)
+		if item.count > 1
+			# build prompt, request user to select
+			puts "Please select from the following:"
+			item.each_with_index.map { |x, i| puts "   #{i}. #{x}" }
+			print "> "
+			selection = gets.chomp.to_i
+
+			# TODO: Harden
+			Gem.win_platform? ? (system "cls") : (system "clear")
+		else
+			selection = 0
+		end
+		return item[selection]
+	end
+
+	def fuzzy_match(item)
+		results = []
+		@tasks.map { |t| t.task.include?(item) ? results.push(t.task) : nil }
+		puts "found: #{results}"
+		return results
+	end
+
+	def show_tasks(show_deleted=false)
+		status = [' ✅', '']
+		if !@tasks.empty?
+			#@tasks.each_with_index.map { |task, i| puts "#{i}. #{task.task}#{status[task.status]}" }
+			@open_tasks.clear
+			@closed_tasks.clear
+			#@tasks.map { |task| task.status = 1 ? @open_tasks.push(task) : @closed_tasks.push(task) }
+
+			@tasks.map { |t| t.status == 1 ? @open_tasks.push(t) : @closed_tasks.push(t) }
+
+			# print open tasks
+			puts "Open Tasks:"
+			@open_tasks.map { |task| puts "\t- #{task.task}#{status[task.status]}" }
+			
+			# print closed tasks
+			puts "Closed Tasks:"
+			@closed_tasks.map { |task| puts "\t-. #{task.task}#{status[task.status]}" }
+		end
+	end
 end
 
-# puts "creating task list"
-todolist = TodoList.new (todo_file) 
 
+
+tl = Tasklist.new(task_file)
 
 def print_menu(menu)
 	puts "please use the following commands: "
@@ -95,16 +137,16 @@ def process_response(tl, resp, sdt)
 	case action.downcase
 	when /^(a|ad|add)$/
 		puts "adding #{item}"
-		tl.add_task(item)
+		tl.add(item)
 	when /^(c|co|com|comp|compl|comple|complet|complete)$/
 		puts "marking #{item} complete"
-		tl.complete_task(item)
+		tl.complete(item)
 	when /^(r|re|reo|reop|reope|reopen)$/
 		puts "reopening #{item}"
-		tl.reopen_task(item)
+		tl.reopen(item)
 	when /^(d|de|del|dele|delet|delete)$/
 		puts "deleting #{item}"
-		tl.delete_task(item)
+		tl.delete(item)
 	when /^(q|qu|qui|quit)$/
 		return 'q'
 	else
@@ -153,5 +195,5 @@ if !ARGV.empty?
 	todolist.show_tasks(SHOW_DELETED_TASKS)
 
 else
-	run_interactive(todolist)
+	run_interactive(tl)
 end
