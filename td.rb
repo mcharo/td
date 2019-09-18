@@ -8,6 +8,74 @@ task_file = user_dir + '/.rubydo.json'
 
 SHOW_DELETED_TASKS = true
 
+class Colorize
+	def self.black(text)
+		return "\e[30m#{text}\e[0m"
+	end
+	def self.red(text)
+		return "\e[31m#{text}\e[0m"
+	end
+	def self.green(text)
+		return "\e[32m#{text}\e[0m"
+	end
+	def self.yellow(text)
+		return "\e[33m#{text}\e[0m"
+	end
+	def self.blue(text)
+		return "\e[34m#{text}\e[0m"
+	end
+	def self.magenta(text)
+		return "\e[35m#{text}\e[0m"
+	end
+	def self.cyan(text)
+		return "\e[36m#{text}\e[0m"
+	end
+	def self.gray(text)
+		return "\e[37m#{text}\e[0m"
+	end
+
+	def self.bg_black(text)       
+		return "\e[40m#{text}\e[0m"
+	end
+	def self.bg_red(text)         
+		return "\e[41m#{text}\e[0m"
+	end
+	def self.bg_green(text)       
+		return "\e[42m#{text}\e[0m"
+	end
+	def self.bg_yellow(text)       
+		return "\e[43m#{text}\e[0m"
+	end
+	def self.bg_blue(text)        
+		return "\e[44m#{text}\e[0m"
+	end
+	def self.bg_magenta(text)     
+		return "\e[45m#{text}\e[0m"
+	end
+	def self.bg_cyan(text)        
+		return "\e[46m#{text}\e[0m"
+	end
+	def self.bg_gray(text)        
+		return "\e[47m#{text}\e[0m"
+	end
+
+	def self.bold(text)           
+		return "\e[1m#{text}\e[22m"
+	end
+	def self.italic(text)         
+		return "\e[3m#{text}\e[23m"
+	end
+	def self.underline(text)      
+		return "\e[4m#{text}\e[24m"
+	end
+	def self.blink(text)          
+		return "\e[5m#{text}\e[25m"
+	end
+	def self.reverse_color(text)  
+		return "\e[7m#{text}\e[27m"
+	end
+end
+
 class Task
 	include Comparable
 
@@ -64,7 +132,6 @@ class Tasklist
 
 	def complete(item)
 		# Complete item in tasklist
-		item = user_select(fuzzy_match(item))
 		for task in tasks
 			if task.task == item && task.status == 1
 				task.status = 0
@@ -74,7 +141,6 @@ class Tasklist
 	end
 
 	def reopen(item)
-		item = user_select(fuzzy_match(item))
 		for task in tasks
 			if task.task == item && task.status == 0
 				task.status = 1
@@ -84,7 +150,6 @@ class Tasklist
 	end
 
 	def delete(item)
-		item = user_select(fuzzy_match(item))
 		@tasks.delete_if { |t| t.task == item }
 		@dirty = true 
 	end
@@ -130,6 +195,7 @@ class Tasklist
 
 	def user_select(item)
 		if item.count > 1
+			Gem.win_platform? ? (system "cls") : (system "clear")
 			# build prompt, request user to select
 			puts "Please select from the following:"
 			item.each_with_index.map { |x, i| puts "   #{i}. #{x}" }
@@ -146,18 +212,17 @@ class Tasklist
 	def fuzzy_match(item)
 		results = []
 		@tasks.map { |t| t.task.include?(item) ? results.push(t.task) : nil }
-		puts "found: #{results}"
+		puts Colorize.yellow("Fuzzy match found: #{results}")
 		return results
 	end
 
-	def show_tasks(show_deleted=false)
+	def show_tasks(show_completed=false)
 		status = [' ✓', '']
 		if !@tasks.empty?
-			#@tasks.each_with_index.map { |task, i| puts "#{i}. #{task.task}#{status[task.status]}" }
 			@open_tasks.clear
 			@closed_tasks.clear
-			#@tasks.map { |task| task.status = 1 ? @open_tasks.push(task) : @closed_tasks.push(task) }
 
+			# Sort tasks into Open / Closed
 			@tasks.map { |t| t.status == 1 ? @open_tasks.push(t) : @closed_tasks.push(t) }
 
 			# print open tasks
@@ -200,30 +265,38 @@ def process_response(tl, resp, sdt)
 	# need to do work here
 	case action.downcase
 	when /^(a|ad|add)$/
-		puts "adding #{item}"
+		puts Colorize.cyan("adding #{item}")
 		tl.add(item)
 	when /^(c|co|com|comp|compl|comple|complet|complete)$/
-		puts "marking #{item} complete"
+		item = tl.user_select(tl.fuzzy_match(item))
+		puts Colorize.cyan("marking #{item} complete")
 		tl.complete(item)
 	when /^(r|re|reo|reop|reope|reopen)$/
-		puts "reopening #{item}"
+		item = tl.user_select(tl.fuzzy_match(item))
+		puts Colorize.green("reopening #{item}")
 		tl.reopen(item)
 	when /^(d|de|del|dele|delet|delete)$/
-		puts "deleting #{item}"
+		item = tl.user_select(tl.fuzzy_match(item))
+		puts Colorize.red("deleting #{item}")
 		tl.delete(item)
 	when /^(q|qu|qui|quit)$/
 		return 'q'
 	# Other commands
 	when /^(cm|cmd)$/
 		begin
+			print "\e[35m"
 			eval(item)
-		rescue StandardError => e  
- 			puts e.message  
-  			puts e.backtrace.inspect
+			puts "\e[0m"
+		rescue StandardError => e
+			print "\e[31m" 
+			puts e.message
+			puts e.backtrace.inspect
+			puts"\e[0m"
 		end
 	when /^(f|fl|flu|flus|flush)$/
 		tl.flush(item)
 	when /^(s|sa|sav|save)$/
+		puts Colorize.green("[Saved]")
 		tl.save
 	else
 		puts "#{action} is not a valid action" # Throw error and do nothing
@@ -237,7 +310,7 @@ def run_interactive(tl)
 	# initialize response
 	resp = ''
 	# menu items to display
-	menu = ['[A]dd <task>', '[C]omplete <task>', '[D]elete <task>', '[Q]uit']
+	menu = ["[A]dd <task>", "[C]omplete <task>", "[D]elete <task>", "[Q]uit"]
 	
 	# infinite loop of interactivity
 	while(resp != 'q')
