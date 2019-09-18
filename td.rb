@@ -24,23 +24,41 @@ class Task
 		@status = 1
 		@timestamp = Time.new
 	end
+
+	def to_hash
+		taskhash = {'task' => @task, 'status' => @status, 'timestamp' => @timestamp}
+		return taskhash
+	end
+
+	def to_json
+		return self.to_hash.to_json
+	end
 end
 
 class Tasklist
+	attr_accessor :autosave
 	attr_accessor :backing_file
 	attr_accessor :tasks
 
 	def initialize(backing_file)
-		@backing_file = backing_file
+		@backing_file = File.expand_path(backing_file)
 		@tasks = Array.new
 		@open_tasks = Array.new
 		@closed_tasks = Array.new
+		@dirty=false
+		@autosave = true
+		self.load(@backing_file)
+	end
+
+	def is_dirty?
+		return @dirty
 	end
 
 	def add(item)
 		# Add to tasklist
 		if !(@tasks.map { |x| x.task }).include?(item)
 			@tasks.push(Task.new(item))
+			@dirty = true
 		end
 	end
 
@@ -50,6 +68,7 @@ class Tasklist
 		for task in tasks
 			if task.task == item && task.status == 1
 				task.status = 0
+				@dirty = true
 			end
 		end
 	end
@@ -59,13 +78,54 @@ class Tasklist
 		for task in tasks
 			if task.task == item && task.status == 0
 				task.status = 1
+				@dirty = true
 			end
 		end
 	end
 
 	def delete(item)
 		item = user_select(fuzzy_match(item))
-		@tasks.delete_if { |t| t.task == item } 
+		@tasks.delete_if { |t| t.task == item }
+		@dirty = true 
+	end
+
+	def save(file=backing_file)
+		storage = File.open(file, 'w')
+		storage.write(self.to_json)
+		storage.close
+		@dirty = false
+	end
+
+	def load(file)
+		if File.exists?(file)
+			if File.empty?(file)
+				puts "nothing to load!!"
+			else
+				data_hash = JSON.parse(File.read(file))
+				self.autosave = data_hash['autosave']
+				for datum in data_hash['tasks']
+					task = Task.new(datum['task'])
+					task.status = datum['status'].to_i
+					task.timestamp = datum['timestamp']
+					@tasks.push(task)
+				end
+			end
+		end
+	end
+
+	def flush(item)
+		if item.downcase == '-y'
+			response = true
+		else
+			response = Readline.readline("Are you sure you want to delete ALL tasks? [y/N]: ").chomp
+			response.downcase == 'y' ? response = true : response = false
+		end
+
+		if response
+			@tasks.clear
+			@dirty = true
+		end
+		Gem.win_platform? ? (system "cls") : (system "clear")
 	end
 
 	def user_select(item)
@@ -109,13 +169,18 @@ class Tasklist
 			@closed_tasks.map { |task| puts "\t- #{task.task}#{status[task.status]}" }
 		end
 	end
+
+	def to_json
+		taskshash = { 'autosave' => @autosave, 'tasks' => @tasks.map { |t| t.to_hash } }
+		taskshash.to_json
+	end
+
 end
-
-
 
 tl = Tasklist.new(task_file)
 
-def print_menu(menu)
+def print_menu(task_list, menu)
+	task_list.show_tasks
 	puts "please use the following commands: "
 	puts "   #{menu.join(", ")}"
 end
@@ -148,11 +213,21 @@ def process_response(tl, resp, sdt)
 		tl.delete(item)
 	when /^(q|qu|qui|quit)$/
 		return 'q'
+	# Other commands
+	when /^(cm|cmd)$/
+		begin
+			eval(item)
+		rescue StandardError => e  
+ 			puts e.message  
+  			puts e.backtrace.inspect
+		end
+	when /^(f|fl|flu|flus|flush)$/
+		tl.flush(item)
+	when /^(s|sa|sav|save)$/
+		tl.save
 	else
 		puts "#{action} is not a valid action" # Throw error and do nothing
 	end
-
-	puts tl.show_tasks(sdt)
 
 	return action[0].downcase
 end
@@ -162,15 +237,17 @@ def run_interactive(tl)
 	# initialize response
 	resp = ''
 	# menu items to display
-	menu = ['Add <task>', 'Complete <task>', 'Delete <task>', 'Quit']
+	menu = ['[A]dd <task>', '[C]omplete <task>', '[D]elete <task>', '[Q]uit']
 	
 	# infinite loop of interactivity
 	while(resp != 'q')
-		print_menu menu
-		# reset response item
+		print_menu(tl, menu)		# reset response item
 		resp = ''
 		resp = Readline.readline("> ").strip
 		resp = process_response(tl, resp, SHOW_DELETED_TASKS)
+		if tl.is_dirty? && tl.autosave
+			tl.save
+		end
 	end
 end
 
@@ -180,7 +257,7 @@ if !ARGV.empty?
 	puts "You entered #{ARGV.join(" ")}"
 	case action.downcase
 	when /^(s|sh|sho|show|p|pr|pri|prin|print)$/
-		puts "printing"
+		puts "printing not implemented"
 	when /^(a|ad|add)$/
 		puts "adding"
 	when /^(c|co|com|comp|compl|comple|complet|complete)$/
