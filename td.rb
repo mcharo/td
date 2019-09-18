@@ -301,7 +301,7 @@ def process_response(tl, resp, interactive)
 	when /^(s|sh|sho|show|p|pr|pri|prin|print)$/
 		# Do nothing here... tasks are shown at the end of this run
 	else
-		puts "#{action} is not a valid action" # Throw error and do nothing
+		puts Colorize.bg_red("#{action} is not a valid action") # Throw error and do nothing
 	end
 
 	interactive ? (return action[0].downcase) : nil
