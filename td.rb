@@ -250,7 +250,7 @@ def print_menu(task_list, menu)
 	puts "   #{menu.join(", ")}"
 end
 
-def process_response(tl, resp, sdt)
+def process_response(tl, resp, interactive)
 	Gem.win_platform? ? (system "cls") : (system "clear")
 	#puts "You entered \"#{resp}\""
 
@@ -298,15 +298,19 @@ def process_response(tl, resp, sdt)
 	when /^(s|sa|sav|save)$/
 		puts Colorize.green("[Saved]")
 		tl.save
+	when /^(s|sh|sho|show|p|pr|pri|prin|print)$/
+		# Do nothing here... tasks are shown at the end of this run
 	else
 		puts "#{action} is not a valid action" # Throw error and do nothing
 	end
 
-	return action[0].downcase
+	interactive ? (return action[0].downcase) : nil
 end
 
 def run_interactive(tl)
 	Gem.win_platform? ? (system "cls") : (system "clear")
+	# set interactive flag
+	interactive = true
 	# initialize response
 	resp = ''
 	# menu items to display
@@ -317,32 +321,17 @@ def run_interactive(tl)
 		print_menu(tl, menu)		# reset response item
 		resp = ''
 		resp = Readline.readline("> ").strip
-		resp = process_response(tl, resp, SHOW_DELETED_TASKS)
+		resp = process_response(tl, resp, interactive)
 		if tl.is_dirty? && tl.autosave
 			tl.save
 		end
 	end
 end
 
-if !ARGV.empty?
-	action = ARGV[0]
-	item = ARGV.drop(1).join(" ")
-	puts "You entered #{ARGV.join(" ")}"
-	case action.downcase
-	when /^(s|sh|sho|show|p|pr|pri|prin|print)$/
-		puts "printing not implemented"
-	when /^(a|ad|add)$/
-		puts "adding"
-	when /^(c|co|com|comp|compl|comple|complet|complete)$/
-		puts "closing"
-	when /^(d|de|del|dele|delet|delete)$/
-		puts "deleting"
-	else
-		puts "unknown command: #{ARGV[0]}"
-	end
-
+if !ARGV.empty?	
+	process_response(tl, ARGV.join(" "), false)
 	tl.show_tasks(SHOW_DELETED_TASKS)
-
+	tl.save
 else
 	run_interactive(tl)
 end
